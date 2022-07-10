@@ -32,7 +32,7 @@ public class JoinExamplesMain {
         );
 
 
-        PCollection<Row> rightPCollection = pipeline
+        PCollection<Row> productPCollection = pipeline
                 .apply(TextIO.read().from(products))
                 .apply("FilterHeader", Filter.by(line -> !line.isEmpty()
                         && !line.contains("ProductId, ProductName, ProductTypeId, Price")))
@@ -50,7 +50,7 @@ public class JoinExamplesMain {
                     }
                 })).setRowSchema(productSchema)
                 ;
-        PCollection<Row> leftPCollection = pipeline
+        PCollection<Row> productTypePCollection = pipeline
                 .apply(TextIO.read().from(productTypes))
                 .apply("FilterHeader", Filter.by(line -> !line.isEmpty()
                         && !line.contains("ProductTypeId, ProductType")))
@@ -69,8 +69,8 @@ public class JoinExamplesMain {
                 ;
 
         //Inner Join
-        PCollection<Row> joinCollection = leftPCollection
-                .apply("Create Join", Join.<Row, Row>innerJoin(rightPCollection)
+        PCollection<Row> joinCollection = productTypePCollection
+                .apply("Create Join", Join.<Row, Row>innerJoin(productPCollection)
 //                        .using("ProductTypeId")
                         .on(Join.FieldsEqual.left("ProductTypeId")
                                 .right("ProductId")
@@ -78,8 +78,8 @@ public class JoinExamplesMain {
                 );
 
         //Left Join
-//        PCollection<Row> joinCollection = leftPCollection
-//                .apply("Create Join", Join.<Row, Row>leftOuterJoin(rightPCollection)
+//        PCollection<Row> joinCollection = productTypePCollection
+//                .apply("Create Join", Join.<Row, Row>leftOuterJoin(productPCollection)
 //                        //.using("ProductTypeId")
 //                        .on(Join.FieldsEqual.left("ProductTypeId")
 //                                .right("ProductTypeId")
@@ -87,8 +87,8 @@ public class JoinExamplesMain {
 //                );
 
         //Right Join
-//        PCollection<Row> joinCollection = leftPCollection
-//                .apply("Create Join", Join.<Row, Row>rightOuterJoin(rightPCollection)
+//        PCollection<Row> joinCollection = productTypePCollection
+//                .apply("Create Join", Join.<Row, Row>rightOuterJoin(productPCollection)
 //                        //.using("ProductTypeId")
 //                        .on(Join.FieldsEqual.left("ProductTypeId")
 //                                .right("ProductTypeId")
@@ -96,8 +96,8 @@ public class JoinExamplesMain {
 //                );
 
         //Full Join
-//        PCollection<Row> joinCollection = leftPCollection
-//                .apply("Create Join", Join.<Row, Row>fullOuterJoin(rightPCollection)
+//        PCollection<Row> joinCollection = productTypePCollection
+//                .apply("Create Join", Join.<Row, Row>fullOuterJoin(productPCollection)
 //                        //.using("ProductTypeId")
 //                        .on(Join.FieldsEqual.left("ProductTypeId")
 //                                .right("ProductTypeId")
@@ -105,8 +105,25 @@ public class JoinExamplesMain {
 //                );
 
         PCollection<String> resultCollection = joinCollection
-                .apply(ParDo.of(new ProcessJoinColumns()))
-                ;
+                .apply(ParDo.of(new DoFn<Row, String>() {
+                    @ProcessElement
+                    public void processElement(ProcessContext c) {
+                        Row rows = c.element();
+                        assert rows != null;
+                        Row productTypeRow = rows.getRow(0);
+                        Row productRow = rows.getRow(1);
+
+                        System.out.println("rows ---> " + rows);
+                        c.output(String.join(",", checkValue(productRow, 0),
+                                checkValue(productRow, 1),
+                                checkValue(productRow, 3),
+                                checkValue(productTypeRow, 1)
+                        ));
+                    }
+                    private CharSequence checkValue(Row row, int index) {
+                        return Objects.isNull(row) ? null : row.getValue(index) + "";
+                    }
+                }));
 
         resultCollection
                 .apply(TextIO
@@ -116,26 +133,5 @@ public class JoinExamplesMain {
                 .withSuffix(".csv"));
 
         pipeline.run().waitUntilFinish();
-    }
-
-    private static class ProcessJoinColumns extends DoFn<Row, String> {
-        @ProcessElement
-        public void processElement(ProcessContext c) {
-            Row rows = c.element();
-            assert rows != null;
-            Row productTypeRow = rows.getRow(0);
-            Row productRow = rows.getRow(1);
-
-            System.out.println("rows ---> " + rows);
-            c.output(String.join(",", checkValue(productRow, 0),
-                    checkValue(productRow, 1),
-                    checkValue(productRow, 3),
-                    checkValue(productTypeRow, 1)
-                            ));
-        }
-
-        private CharSequence checkValue(Row row, int index) {
-            return Objects.isNull(row) ? null : row.getValue(index) + "";
-        }
     }
 }

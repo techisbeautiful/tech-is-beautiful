@@ -28,48 +28,41 @@ public class SideInputExampleMain {
                                 !line.isEmpty() && !line.contains("ProductId, ProductName, ProductTypeId, Price"))
                         );
 
-        PCollectionView<Double> maxPrice = productCollection
+        PCollectionView<Double> averagePrice = productCollection
                 .apply("Extract Price", FlatMapElements.into(TypeDescriptors.doubles())
                         .via((String line) ->
                                 Collections.singletonList(Double.parseDouble(line.split(",")[3]))
                         ))
-//                .apply("Filter Max", Max.doublesGlobally())
-//                .apply(View.asSingleton())
-                .apply("Average Price", Combine.globally(new Average()).asSingletonView()   )
-                ;
+                .apply("Average Price", Combine.globally((SerializableFunction<Iterable<Double>, Double>) prices -> {
+                    List<Double> collect = StreamSupport.stream(prices
+                                    .spliterator(), false)
+                            .collect(Collectors.toList());
+                    double sum = collect.stream().mapToDouble(i -> i).sum();
+                    return sum / collect.size();
+                }).asSingletonView());
 
-        maxPrice.getPCollection().apply("Preview grouped data",
-                MapElements.into(TypeDescriptors.doubles()).via(
-                        x -> { System.out.println("x ----> " + x); return Double.valueOf(x.toString()); })
-        );
-        dou
-        productCollection.apply("Side Input", ParDo.of(new DoFn<String, String>() {
-            @ProcessElement
-            public void processElement(ProcessContext processContext) {
-                String strings = processContext.element();
-                assert strings!= null;
-                String[] splits = strings.split(",");
-                double max = processContext.sideInput(maxPrice);
-                double price = Double.parseDouble(splits[3].trim());
+        PCollection<String> resultCollection = productCollection.apply(ParDo
+                .of(new DoFn<String, String>() {
+                    @ProcessElement
+                    public void process(ProcessContext processContext) {
+                        double average = processContext.sideInput(averagePrice);
+                        String strings = processContext.element();
+                        assert strings!= null;
+                        String[] splits = strings.split(",");
+                        double price = Double.parseDouble(splits[3].trim());
+                        if (price >= average) {
+                            processContext.output(String.join(",", splits[0], splits[1], splits[2], splits[3]));
+                        }
+                    }
+                }).withSideInputs(averagePrice));
 
-                //The product greater than average price
-                if (price >= max) {
-                    System.out.println("product info: " + String.join(",", splits[0], splits[1], splits[2], splits[3]));
-                }
-            }
-        }).withSideInputs(maxPrice));
+        resultCollection
+                .apply(TextIO
+                        .write().withoutSharding()
+                        .to("result/side_input_products")
+                        .withHeader("ProductId, ProductName, Price, ProductType")
+                        .withSuffix(".csv"));
 
         pipeline.run().waitUntilFinish();
-    }
-
-    private static class Average implements SerializableFunction<Iterable<Double>, Double>{
-        @Override
-        public Double apply(Iterable<Double> prices) {
-            List<Double> collect = StreamSupport.stream(prices
-                            .spliterator(), false)
-                    .collect(Collectors.toList());
-            double sum = collect.stream().mapToDouble(i -> i).sum();
-            return sum / collect.size();
-        }
     }
 }
