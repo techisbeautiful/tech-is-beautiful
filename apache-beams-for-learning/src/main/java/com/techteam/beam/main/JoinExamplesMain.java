@@ -69,31 +69,31 @@ public class JoinExamplesMain {
                 ;
 
         //Inner Join
-        PCollection<Row> joinCollection = productTypePCollection
-                .apply("Create Join", Join.<Row, Row>innerJoin(productPCollection)
+//        PCollection<Row> joinCollection = productTypePCollection
+//                .apply("Create Join", Join.<Row, Row>innerJoin(productPCollection)
 //                        .using("ProductTypeId")
-                        .on(Join.FieldsEqual.left("ProductTypeId")
-                                .right("ProductId")
-                        )
-                );
+////                        .on(Join.FieldsEqual.left("ProductTypeId")
+////                                .right("ProductId")
+////                        )
+//                );
 
         //Left Join
 //        PCollection<Row> joinCollection = productTypePCollection
 //                .apply("Create Join", Join.<Row, Row>leftOuterJoin(productPCollection)
-//                        //.using("ProductTypeId")
-//                        .on(Join.FieldsEqual.left("ProductTypeId")
-//                                .right("ProductTypeId")
-//                        )
+//                        .using("ProductTypeId")
+////                        .on(Join.FieldsEqual.left("ProductTypeId")
+////                                .right("ProductTypeId")
+////                        )
 //                );
 
         //Right Join
-//        PCollection<Row> joinCollection = productTypePCollection
-//                .apply("Create Join", Join.<Row, Row>rightOuterJoin(productPCollection)
-//                        //.using("ProductTypeId")
+        PCollection<Row> joinCollection = productTypePCollection
+                .apply("Create Join", Join.<Row, Row>rightOuterJoin(productPCollection)
+                        .using("ProductTypeId")
 //                        .on(Join.FieldsEqual.left("ProductTypeId")
 //                                .right("ProductTypeId")
 //                        )
-//                );
+                );
 
         //Full Join
 //        PCollection<Row> joinCollection = productTypePCollection
@@ -128,7 +128,7 @@ public class JoinExamplesMain {
         resultCollection
                 .apply(TextIO
                 .write().withoutSharding()
-                .to("result/products")
+                .to("result/join_products")
                 .withHeader("ProductId, ProductName, Price, ProductType")
                 .withSuffix(".csv"));
 

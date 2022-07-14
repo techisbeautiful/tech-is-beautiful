@@ -8,6 +8,8 @@ import org.apache.beam.sdk.transforms.join.CoGroupByKey;
 import org.apache.beam.sdk.transforms.join.KeyedPCollectionTuple;
 import org.apache.beam.sdk.values.*;
 
+import java.util.Iterator;
+
 public class GroupByKeyExamplesMain {
     public static void main(String[] args) {
         runGroupByKeyBigQuery();
@@ -28,7 +30,7 @@ public class GroupByKeyExamplesMain {
                                         assert row != null;
                                         String[] splits = row.split(",");
 
-                                        c.output(KV.of(Integer.valueOf(splits[0]), String.join(",",
+                                        c.output(KV.of(Integer.valueOf(splits[2].trim()), String.join(",",
                                                 splits[0], splits[1], splits[2], splits[3])));
                                     }
                                 }));
@@ -48,16 +50,181 @@ public class GroupByKeyExamplesMain {
                             }
                         }));
 
+
         TupleTag<String> productTag = new TupleTag<>();
         TupleTag<String> productTypeTag = new TupleTag<>();
 
-        PCollection<KV<Integer, CoGbkResult>> result = KeyedPCollectionTuple.of(productTag, productCollection)
+        PCollection<KV<Integer, CoGbkResult>> groupResult = KeyedPCollectionTuple.of(productTag, productCollection)
                         .and(productTypeTag, productTypeCollection).apply(CoGroupByKey.create());
 
-        result.apply("Preview grouped data",
-                MapElements.into(TypeDescriptors.strings()).via(
-                        x -> { System.out.println("x ----> " + x); return ""; })
-        );
+        PCollection<String> resultInnerCollection = groupResult
+                .apply(ParDo.of(new DoFn<KV<Integer, CoGbkResult>, String>() {
+                    @ProcessElement
+                    public void process(ProcessContext c) {
+                        KV<Integer, CoGbkResult> e = c.element();
+                        Iterable<String> productsIter = e.getValue().getAll(productTag);
+                        Iterable<String> producrTypesIter = e.getValue().getAll(productTypeTag);
+
+                        StringBuilder group = new StringBuilder();
+                        StringBuilder row = new StringBuilder();
+                        for (String localInputName : producrTypesIter) {
+                            group.append(String.join(",", localInputName));
+                        }
+
+                        Iterator<String> iterator = productsIter.iterator();
+                        while(iterator.hasNext()) {
+                            String localInputName = iterator.next();
+                            String[] products = localInputName.split(",");
+                            String[] productTypes = group.toString().split(",");
+
+                            if (productTypes.length > 1) {
+                                row.append(String.join(",", products[0], products[1], products[3], productTypes[1]));
+                                if (iterator.hasNext()) {
+                                    row.append("\n");
+                                }
+                            }
+
+                        }
+                        if (row.length() > 0) {
+                            c.output(row.toString());
+                        }
+                    }
+                }));
+
+        PCollection<String> resultLeftCollection = groupResult
+                .apply(ParDo.of(new DoFn<KV<Integer, CoGbkResult>, String>() {
+                    @ProcessElement
+                    public void process(ProcessContext c) {
+                        KV<Integer, CoGbkResult> e = c.element();
+                        Iterable<String> productsIter = e.getValue().getAll(productTag);
+                        Iterable<String> producrTypesIter = e.getValue().getAll(productTypeTag);
+
+                        StringBuilder group = new StringBuilder();
+                        StringBuilder row = new StringBuilder();
+                        for (String localInputName : producrTypesIter) {
+                            group.append(String.join(",", localInputName));
+                        }
+
+                        Iterator<String> iterator = productsIter.iterator();
+                        String[] productTypes = group.toString().split(",");
+                        while(iterator.hasNext()) {
+                            String localInputName = iterator.next();
+                            String[] products = localInputName.split(",");
+                            if (productTypes.length > 1) {
+                                row.append(String.join(",", products[0], products[1], products[3], productTypes[1]));
+                                if (iterator.hasNext()) {
+                                    row.append("\n");
+                                }
+                            }
+                        }
+
+                        if (row.length() > 0) {
+                            c.output(row.toString());
+                        } else if (group.length() > 0 && row.length() == 0) {
+                            c.output(String.join(",", null, null, null, productTypes[1]));
+                        }
+                    }
+                }));
+
+        PCollection<String> resultRightCollection = groupResult
+                .apply(ParDo.of(new DoFn<KV<Integer, CoGbkResult>, String>() {
+                    @ProcessElement
+                    public void process(ProcessContext c) {
+                        KV<Integer, CoGbkResult> e = c.element();
+                        Iterable<String> productsIter = e.getValue().getAll(productTag);
+                        Iterable<String> producrTypesIter = e.getValue().getAll(productTypeTag);
+
+                        StringBuilder group = new StringBuilder();
+                        StringBuilder row = new StringBuilder();
+                        for (String localInputName : producrTypesIter) {
+                            group.append(String.join(",", localInputName));
+                        }
+
+                        Iterator<String> iterator = productsIter.iterator();
+                        String[] productTypes = group.toString().split(",");
+                        while(iterator.hasNext()) {
+                            String localInputName = iterator.next();
+                            String[] products = localInputName.split(",");
+                            if (productTypes.length > 1) {
+                                row.append(String.join(",", products[0], products[1], products[3], productTypes[1]));
+                            } else {
+                                row.append(String.join(",", products[0], products[1], products[3], null));
+                            }
+                            if (iterator.hasNext()) {
+                                row.append("\n");
+                            }
+                        }
+
+                        if (row.length() > 0) {
+                            c.output(row.toString());
+                        }
+                    }
+                }));
+
+        PCollection<String> resultFullCollection = groupResult
+                .apply(ParDo.of(new DoFn<KV<Integer, CoGbkResult>, String>() {
+                    @ProcessElement
+                    public void process(ProcessContext c) {
+                        KV<Integer, CoGbkResult> e = c.element();
+                        Iterable<String> productsIter = e.getValue().getAll(productTag);
+                        Iterable<String> producrTypesIter = e.getValue().getAll(productTypeTag);
+
+                        StringBuilder group = new StringBuilder();
+                        StringBuilder row = new StringBuilder();
+                        for (String localInputName : producrTypesIter) {
+                            group.append(String.join(",", localInputName));
+                        }
+
+                        Iterator<String> iterator = productsIter.iterator();
+                        String[] productTypes = group.toString().split(",");
+                        while(iterator.hasNext()) {
+                            String localInputName = iterator.next();
+                            String[] products = localInputName.split(",");
+                            if (productTypes.length > 1) {
+                                row.append(String.join(",", products[0], products[1], products[3], productTypes[1]));
+                            } else {
+                                row.append(String.join(",", products[0], products[1], products[3], null));
+                            }
+                            if (iterator.hasNext()) {
+                                row.append("\n");
+                            }
+                        }
+
+                        if (row.length() > 0) {
+                            c.output(row.toString());
+                        } else if (group.length() > 0 && row.length() == 0) {
+                            c.output(String.join(",", null, null, null, productTypes[1]));
+                        }
+                    }
+                }));
+
+        resultInnerCollection
+                .apply(TextIO
+                        .write().withoutSharding()
+                        .to("result/group_inner_join_products")
+                        .withHeader("ProductId, ProductName, Price, ProductType")
+                        .withSuffix(".csv"));
+
+        resultLeftCollection
+                .apply(TextIO
+                        .write().withoutSharding()
+                        .to("result/group_left_join_products")
+                        .withHeader("ProductId, ProductName, Price, ProductType")
+                        .withSuffix(".csv"));
+
+        resultRightCollection
+                .apply(TextIO
+                        .write().withoutSharding()
+                        .to("result/group_right_join_products")
+                        .withHeader("ProductId, ProductName, Price, ProductType")
+                        .withSuffix(".csv"));
+
+        resultFullCollection
+                .apply(TextIO
+                        .write().withoutSharding()
+                        .to("result/group_full_join_products")
+                        .withHeader("ProductId, ProductName, Price, ProductType")
+                        .withSuffix(".csv"));
 
         pipeline.run().waitUntilFinish();
     }

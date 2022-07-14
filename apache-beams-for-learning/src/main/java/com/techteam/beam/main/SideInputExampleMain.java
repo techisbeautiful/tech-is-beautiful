@@ -21,7 +21,7 @@ public class SideInputExampleMain {
         Pipeline pipeline = Pipeline.create();
 
         String products = "/data/section1/products.csv";
-
+        String productTypes = "/data/section1/product_types.csv";
         PCollection<String> productCollection =
                 pipeline.apply(TextIO.read().from(products))
                         .apply("FilterHeader", Filter.by(line ->
