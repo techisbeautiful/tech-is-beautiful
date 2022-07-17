@@ -30,6 +30,8 @@ public class GroupByKeyExamplesMain {
                                         assert row != null;
                                         String[] splits = row.split(",");
 
+                                        //key: ProductTypeId
+                                        //values: ProductId, ProductName, ProductTypeId, Price
                                         c.output(KV.of(Integer.valueOf(splits[2].trim()), String.join(",",
                                                 splits[0], splits[1], splits[2], splits[3])));
                                     }
