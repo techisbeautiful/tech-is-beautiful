@@ -1,0 +1,13 @@
+ProductId, ProductName, ProductTypeId, Price
+1, chair, 1, 180
+2, table, 1, 260
+3, fish tank (small), 2, 550
+4, Microwave, 3, 260
+5, Washing machine, 3, 1000
+6, Rice Cooker, 3, 220
+7, Vacuum cleaner, 3, 450
+8, Dishwasher, 3, 1800
+9, ToothBrush, 4, 220
+10, Plastic razor, 4, 10
+11, Electric razor, 3, 100
+12, Fridge, 3, 850
